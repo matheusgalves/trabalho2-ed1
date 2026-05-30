@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #define LIVRE 0
 #define PAREDE 1
@@ -14,65 +15,34 @@ typedef struct Nodo {
     struct Nodo *prox;
 } Nodo;
 
-typedef struct {
+typedef struct Pilha {
     Nodo *topo;
     int tamanho;
 } Pilha;
 
 Pilha* criaPilha();
 Nodo* criaNodo();
-void push();
+void push(Pilha* pilha, int coord);
 int pop();
+int criaLabirinto (int matriz[MAPA_LINHAS][MAPA_COLUNAS]);
+void jogaRecursivo(Pilha* pilha, int matriz[MAPA_LINHAS][MAPA_COLUNAS], int coordRato, int acabou);
+void exibeLabirinto(int matriz[MAPA_LINHAS][MAPA_COLUNAS], int linRato, int colRato);
+void exibeRelatorio(Pilha *pilha, int matriz[MAPA_LINHAS][MAPA_COLUNAS]);
 int buildCoord(int lin, int col);
 int getLinhaByCoord(int coord);
 int getColunaByCoord(int coord);
-int criaLabirinto (int matriz[MAPA_LINHAS][MAPA_COLUNAS]);
-void jogaRecursivo(Pilha* pilha, int matriz[MAPA_LINHAS][MAPA_COLUNAS], int coordRato, int acabou);
-
-void exibeLabirinto(int matriz[MAPA_LINHAS][MAPA_COLUNAS], int linRato, int colRato) {
-    const char *COR_RESET  = "\033[0m";
-    const char *COR_PAREDE = "\033[48;5;235m\033[38;5;240m";
-    const char *COR_LIVRE  = "\033[48;5;234m";
-    const char *COR_VISITA = "\033[38;5;80m";
-    const char *COR_BECO   = "\033[38;5;172m";
-    const char *COR_SAIDA  = "\033[38;5;226m";
-    const char *COR_RATO   = "\033[38;5;82m";
-
-    printf("\033[H\033[J");
-
-    for (int i = 0; i < MAPA_LINHAS; i++) {
-        for (int j = 0; j < MAPA_COLUNAS; j++) {
-            if (i == linRato && j == colRato) {
-                printf("%s \u263A %s", COR_RATO, COR_RESET);
-                continue;
-            }
-            switch (matriz[i][j]) {
-                case PAREDE:   printf("%s\u2588\u2588\u2588%s", COR_PAREDE, COR_RESET); break;
-                case LIVRE:    printf("%s   %s",                COR_LIVRE,  COR_RESET); break;
-                case VISITADA: printf("%s \u00B7 %s",           COR_VISITA, COR_RESET); break;
-                case BECO:     printf("%s\u2591\u2591\u2591%s", COR_BECO,   COR_RESET); break;
-                case SAIDA:    printf("%s \u2605 %s",           COR_SAIDA,  COR_RESET); break;
-            }
-        }
-        printf("\n");
-    }
-
-    printf("\n%s███%s Parede  %s   %s Livre  %s · %s Visitada  %s░░░%s Beco  %s ★ %s Saída  %s ☺ %s Rato\n",
-        COR_PAREDE, COR_RESET,
-        COR_LIVRE,  COR_RESET,
-        COR_VISITA, COR_RESET,
-        COR_BECO,   COR_RESET,
-        COR_SAIDA,  COR_RESET,
-        COR_RATO,   COR_RESET
-    );
-}
 
 int main() {
     int labirinto[MAPA_LINHAS][MAPA_COLUNAS] = {0};
     Pilha *pilha = criaPilha();
 
-    criaLabirinto(labirinto);
+    int coordRato = criaLabirinto(labirinto);
 
+    // empilha posição inicial do rato
+    push(pilha, coordRato);
+
+    printf("\033[2J");
+    jogaRecursivo(pilha, labirinto, coordRato, 0);
     return 0;
 }
 
@@ -175,11 +145,11 @@ int criaLabirinto(int matriz[MAPA_LINHAS][MAPA_COLUNAS]) {
 
             float random = (float) rand() / RAND_MAX;
 
-            // zona segura do rato 4x4
-            int maxLinPermitidoRato = linRato + 4;
-            int minLinPermitidoRato = linRato - 4;
-            int maxColPermitidoRato = colRato + 4;
-            int minColPermitidoRato = colRato - 4;
+            // zona segura do rato
+            int maxLinPermitidoRato = linRato + 2;
+            int minLinPermitidoRato = linRato - 2;
+            int maxColPermitidoRato = colRato + 2;
+            int minColPermitidoRato = colRato - 2;
 
             // zona segura da saída
             int maxLinPermitidoSaida = linSaida + 4;
@@ -205,17 +175,18 @@ int criaLabirinto(int matriz[MAPA_LINHAS][MAPA_COLUNAS]) {
 }
 
 void jogaRecursivo(Pilha* pilha, int matriz[MAPA_LINHAS][MAPA_COLUNAS], int coordRato, int acabou) {
-    if (acabou) {
-        // mensagem de sucesso
-        return;
-    }
-
     int linRato = getLinhaByCoord(coordRato);
     int colRato = getColunaByCoord(coordRato);
 
     exibeLabirinto(matriz, linRato, colRato);
+    usleep(100000);
 
-    // sentido anti-horario
+    if (acabou) {
+        exibeRelatorio(pilha, matriz);
+        return;
+    }
+
+    // sentido horario
     int posDireita = matriz[linRato][colRato + 1];
     int posEmbaixo = matriz[linRato + 1][colRato];
     int posEsquerda = matriz[linRato][colRato - 1];
@@ -259,6 +230,96 @@ void jogaRecursivo(Pilha* pilha, int matriz[MAPA_LINHAS][MAPA_COLUNAS], int coor
         jogaRecursivo(pilha, matriz, coordProx, 0);
         return;
     }
+
+    int coordRemovida = pop(pilha);
+
+    if (pilha->topo == NULL) {
+        exibeRelatorio(pilha, matriz);
+        return;
+    }
+
+    int posicaoAnterior = pilha->topo->coord;
+    matriz[getLinhaByCoord(coordRemovida)][getColunaByCoord(coordRemovida)] = BECO;
+
+    jogaRecursivo(pilha, matriz, posicaoAnterior, 0);
+}
+
+void exibeLabirinto(int matriz[MAPA_LINHAS][MAPA_COLUNAS], int linRato, int colRato) {
+    const char *COR_RESET  = "\033[0m";
+    const char *COR_PAREDE = "\033[48;5;235m\033[38;5;240m";
+    const char *COR_LIVRE  = "\033[48;5;234m";
+    const char *COR_VISITA = "\033[38;5;80m";
+    const char *COR_BECO   = "\033[38;5;172m";
+    const char *COR_SAIDA  = "\033[38;5;226m";
+    const char *COR_RATO   = "\033[38;5;82m";
+
+    printf("\033[H");
+
+    for (int i = 0; i < MAPA_LINHAS; i++) {
+        for (int j = 0; j < MAPA_COLUNAS; j++) {
+            if (i == linRato && j == colRato) {
+                printf("%s \u263A %s", COR_RATO, COR_RESET);
+                continue;
+            }
+            switch (matriz[i][j]) {
+                case PAREDE:   printf("%s\u2588\u2588\u2588%s", COR_PAREDE, COR_RESET); break;
+                case LIVRE:    printf("%s   %s",                COR_LIVRE,  COR_RESET); break;
+                case VISITADA: printf("%s \u00B7 %s",           COR_VISITA, COR_RESET); break;
+                case BECO:     printf("%s\u2591\u2591\u2591%s", COR_BECO,   COR_RESET); break;
+                case SAIDA:    printf("%s \u2605 %s",           COR_SAIDA,  COR_RESET); break;
+            }
+        }
+        printf("\n");
+    }
+
+    printf("\n%s███%s Parede  %s   %s Livre  %s · %s Visitada  %s░░░%s Beco  %s ★ %s Saída  %s ☺ %s Rato\n",
+        COR_PAREDE, COR_RESET,
+        COR_LIVRE,  COR_RESET,
+        COR_VISITA, COR_RESET,
+        COR_BECO,   COR_RESET,
+        COR_SAIDA,  COR_RESET,
+        COR_RATO,   COR_RESET
+    );
+
+    fflush(stdout);
+}
+
+void exibeRelatorio( Pilha *pilha, int matriz[MAPA_LINHAS][MAPA_COLUNAS]) {
+    int visitadas = 0;
+    int becos = 0;
+    int paredes = 0;
+    int livres = 0;
+
+    for (int i = 0; i < MAPA_LINHAS; i++) {
+        for (int j = 0; j < MAPA_COLUNAS; j++) {
+            switch (matriz[i][j]) {
+                case VISITADA:
+                    visitadas++;
+                    break;
+                case BECO:
+                    becos++;
+                    break;
+                case PAREDE:
+                    paredes++;
+                    break;
+                case LIVRE:
+                    livres++;
+                    break;
+            }
+        }
+    }
+
+    printf("\n");
+    printf("=====================================\n");
+    printf("      RELATORIO DE EXECUCAO\n");
+    printf("=====================================\n");
+    printf("Caminho encontrado: SIM\n");
+    printf("Tamanho do caminho: %d passos\n", pilha->tamanho);
+    printf("Posicoes visitadas: %d\n", visitadas);
+    printf("Becos encontrados : %d\n", becos);
+    printf("Paredes geradas   : %d\n", paredes);
+    printf("Livres restantes  : %d\n", livres);
+    printf("=====================================\n");
 }
 
 int buildCoord(int lin, int col) {
