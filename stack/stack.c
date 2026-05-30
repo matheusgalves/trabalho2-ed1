@@ -23,7 +23,8 @@ typedef struct Pilha {
 Pilha* criaPilha();
 Nodo* criaNodo();
 void push(Pilha* pilha, int coord);
-int pop();
+int pop(Pilha* pilha);
+void liberaPilha(Pilha* pilha);
 int criaLabirinto (int matriz[MAPA_LINHAS][MAPA_COLUNAS]);
 void jogaRecursivo(Pilha* pilha, int matriz[MAPA_LINHAS][MAPA_COLUNAS], int coordRato, int acabou);
 void exibeLabirinto(int matriz[MAPA_LINHAS][MAPA_COLUNAS], int linRato, int colRato);
@@ -38,11 +39,10 @@ int main() {
 
     int coordRato = criaLabirinto(labirinto);
 
-    // empilha posição inicial do rato
-    push(pilha, coordRato);
-
     printf("\033[2J");
     jogaRecursivo(pilha, labirinto, coordRato, 0);
+
+    liberaPilha(pilha);
     return 0;
 }
 
@@ -194,8 +194,8 @@ void jogaRecursivo(Pilha* pilha, int matriz[MAPA_LINHAS][MAPA_COLUNAS], int coor
 
     // Saída
     if (posDireita == SAIDA) {
+        push(pilha, coordRato);
         int coordProx = buildCoord(linRato, colRato + 1);
-        push(pilha, coordProx);
         matriz[linRato][colRato] = VISITADA;
         jogaRecursivo(pilha, matriz, coordProx, 1);
         return;
@@ -203,43 +203,42 @@ void jogaRecursivo(Pilha* pilha, int matriz[MAPA_LINHAS][MAPA_COLUNAS], int coor
 
     // Livre
     if (posDireita == LIVRE) {
+        push(pilha, coordRato);
         int coordProx = buildCoord(linRato, colRato + 1);
-        push(pilha, coordProx);
         matriz[linRato][colRato] = VISITADA;
         jogaRecursivo(pilha, matriz, coordProx, 0);
         return;
     }
     if (posEmbaixo == LIVRE) {
+        push(pilha, coordRato);
         int coordProx = buildCoord(linRato + 1, colRato);
-        push(pilha, coordProx);
         matriz[linRato][colRato] = VISITADA;
         jogaRecursivo(pilha, matriz, coordProx, 0);
         return;
     }
     if (posEsquerda == LIVRE) {
+        push(pilha, coordRato);
         int coordProx = buildCoord(linRato, colRato - 1);
-        push(pilha, coordProx);
         matriz[linRato][colRato] = VISITADA;
         jogaRecursivo(pilha, matriz, coordProx, 0);
         return;
     }
     if (posEmCima == LIVRE) {
+        push(pilha, coordRato);
         int coordProx = buildCoord(linRato - 1, colRato);
-        push(pilha, coordProx);
         matriz[linRato][colRato] = VISITADA;
         jogaRecursivo(pilha, matriz, coordProx, 0);
         return;
     }
 
-    int coordRemovida = pop(pilha);
+    matriz[linRato][colRato] = BECO;
+    int posicaoAnterior = pop(pilha);
 
-    if (pilha->topo == NULL) {
+    // pilha vazia = sem saída
+    if (posicaoAnterior == -1) {
         exibeRelatorio(pilha, matriz);
         return;
     }
-
-    int posicaoAnterior = pilha->topo->coord;
-    matriz[getLinhaByCoord(coordRemovida)][getColunaByCoord(coordRemovida)] = BECO;
 
     jogaRecursivo(pilha, matriz, posicaoAnterior, 0);
 }
@@ -313,7 +312,11 @@ void exibeRelatorio( Pilha *pilha, int matriz[MAPA_LINHAS][MAPA_COLUNAS]) {
     printf("=====================================\n");
     printf("      RELATORIO DE EXECUCAO\n");
     printf("=====================================\n");
-    printf("Caminho encontrado: SIM\n");
+    if (pilha->topo == NULL) {
+        printf("Caminho encontrado: NÃO\n");
+    } else {
+        printf("Caminho encontrado: SIM\n");
+    }
     printf("Tamanho do caminho: %d passos\n", pilha->tamanho);
     printf("Posicoes visitadas: %d\n", visitadas);
     printf("Becos encontrados : %d\n", becos);
@@ -329,6 +332,7 @@ int buildCoord(int lin, int col) {
 int getLinhaByCoord(int coord) {
     return coord / 100;
 }
+
 int getColunaByCoord(int coord) {
     return coord % 100;
 }
