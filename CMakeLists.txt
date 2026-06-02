@@ -3,5 +3,5 @@ project(trabalho2_ed1 C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(trabalho2_ed1
-        stack/stack.c)
+add_executable(programa_fila  queue/queue.c)
+add_executable(programa_pilha stack/stack.c)
